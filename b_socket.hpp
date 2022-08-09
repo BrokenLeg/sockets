@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 //TCP socket
 
 class b_socket
@@ -21,6 +19,6 @@ public:
 
     void b_listen(int users_num);
     int b_accept();
-    void run(std::function<void(char*)> dispatcher);
+    void run();
 };
 

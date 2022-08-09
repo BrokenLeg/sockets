@@ -16,10 +16,11 @@ b_socket::b_socket(const char* port, const char* hostname, bool is_serv)
 {
     addrinfo hints;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_socktype = SOCK_STREAM;
     
-    if (is_serv)
-        hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+   // if (is_serv)
+    hints.ai_flags = AI_PASSIVE;
 
     addrinfo *address;
     if (getaddrinfo(hostname, port, &hints, &address))
@@ -33,8 +34,24 @@ b_socket::b_socket(const char* port, const char* hostname, bool is_serv)
         exit(1);
     }
 
-    if (is_serv)
-        bind(sd, address->ai_addr, address->ai_addrlen);
+    while (address)
+    {
+        if(bind(sd, address->ai_addr, address->ai_addrlen))
+        {
+            address = address->ai_next;
+            //std::cout << "next\n";
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if(!address)
+    {
+        perror("bind");
+        exit(1);
+    }
 
 }
 b_socket::~b_socket()
@@ -54,7 +71,8 @@ b_socket_server::~b_socket_server()
 
 void b_socket_server::b_listen(int users_num)
 {
-    listen(b_socket::sd, users_num);
+    if(listen(b_socket::sd, users_num) == -1)
+        exit(1);
 }
 
 int b_socket_server::b_accept()
@@ -72,7 +90,7 @@ int b_socket_server::b_accept()
     return socket_client;
 }
 
-void b_socket_server::run(std::function<void(char*)> dispatcher)
+void b_socket_server::run()
 {
     fd_set master;
     FD_ZERO(&master);
@@ -83,7 +101,8 @@ void b_socket_server::run(std::function<void(char*)> dispatcher)
     while (1)
     {
         fd_set reads = master;
-        select(max_socket+1, &reads, 0, 0, 0);
+        if (select(max_socket+1, &reads, 0, 0, 0) == -1)
+            exit(1);
 
         for (int socket = 1; socket <= max_socket; socket++)
         {
@@ -124,9 +143,20 @@ void b_socket_server::run(std::function<void(char*)> dispatcher)
                         FD_CLR(socket, &master);
                     }
 
-                    dispatcher(req);
+                    printf("%.*s", br, req);
+
+                    //dispatcher(req);
                 }
             }
+
+        }
+    }
+
+    for (int socket = 1; socket <= max_socket; socket++)
+    {
+        if (FD_ISSET(socket, &master))
+        {
+            close(socket);
 
         }
     }
